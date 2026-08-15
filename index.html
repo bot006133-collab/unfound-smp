@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Support Center</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0d0f14;color:#f3f4f6;font:15px Arial,sans-serif}nav{padding:16px 6%;border-bottom:1px solid #252a35;display:flex;gap:8px;flex-wrap:wrap}button,a{background:#191e28;color:#fff;border:1px solid #303746;border-radius:7px;padding:10px 13px;text-decoration:none;cursor:pointer}main{max-width:1000px;margin:35px auto;padding:0 18px}.card{background:#151922;border:1px solid #292f3c;border-radius:10px;padding:22px;margin-bottom:15px}input,textarea,select{display:block;width:100%;padding:11px;margin:7px 0 14px;background:#0d1016;color:#fff;border:1px solid #303746;border-radius:6px}textarea{min-height:130px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.item{border:1px solid #303746;border-radius:8px;padding:15px;margin:10px 0}.muted{color:#9ca3af;font-size:13px}.code{font-size:28px;letter-spacing:4px;font-weight:bold;margin:12px 0}.hidden{display:none}.danger{color:#ff8d8d}@media(max-width:650px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+<a href="#home">Home</a><a href="#staff">Staff Application</a><a href="#media">Media Application</a><a href="#builder">Builder Application</a>
+<a href="#ban">Ban/Mute Ticket</a><a href="#bug">Bug Report</a><a href="#status">Check Status</a><a href="#login">Staff Login</a><a href="#panel">Panel</a>
+</nav>
+<main id="app"></main>
+<script>
+const types={
+staff:["Staff Application","Pending","Accepted","Denied"],
+media:["Media Application","Pending","Accepted","Denied"],
+builder:["Builder Application","Pending","Accepted","Denied"],
+ban:["Ban/Mute Ticket","Open","Closed"],
+bug:["Bug Report","Open","Closed"]
+};
+const key="ticket_panel_data";
+let db=JSON.parse(localStorage.getItem(key)||"[]");
+const save=()=>localStorage.setItem(key,JSON.stringify(db));
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function id(){let c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",x;do{x=Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>c[b%c.length]).join("")}while(db.some(v=>v.code===x));return x}
+function form(t){
+ document.getElementById("app").innerHTML=`<div class="card"><h1>${types[t][0]}</h1>
+ <form onsubmit="submitForm(event,'${t}')"><div class="grid"><div><label>Name</label><input name="name" required></div><div><label>Discord (optional)</label><input name="discord"></div></div>
+ <label>Details</label><textarea name="content" required></textarea><button>Submit</button></form></div>`;
+}
+function submitForm(e,t){
+ e.preventDefault();let f=Object.fromEntries(new FormData(e.target)),code=id();
+ db.unshift({id:Date.now(),code,type:t,name:f.name,discord:f.discord,content:f.content,status:types[t][1],notes:"",date:new Date().toLocaleString()});save();
+ document.getElementById("app").innerHTML=`<div class="card"><h1>Submitted</h1><p>Save this tracking ID:</p><div class="code">${code}</div><p>You can use it on the status page.</p><a href="#status">Check Status</a></div>`;
+}
+function status(){
+ document.getElementById("app").innerHTML=`<div class="card"><h1>Check Application Status</h1><form onsubmit="check(event)"><input name="code" placeholder="Tracking ID" required><button>Check</button></form><div id="result"></div></div>`;
+}
+function check(e){
+ e.preventDefault();let code=new FormData(e.target).get("code").trim().toUpperCase(),x=db.find(v=>v.code===code),r=document.getElementById("result");
+ r.innerHTML=x?`<div class="item"><b>${types[x.type][0]}</b><p>Status: <strong>${x.status}</strong></p><span class="muted">ID: ${x.code}</span></div>`:`<p class="danger">That ID was not found.</p>`;
+}
+function login(){
+ document.getElementById("app").innerHTML=`<div class="card"><h1>Staff Login</h1><p class="muted">Demo/static GitHub Pages login.</p>
+ <form onsubmit="doLogin(event)"><input name="user" placeholder="Username" required><input name="pass" maxlength="5" placeholder="5-character password" required><button>Login</button></form></div>`;
+}
+function doLogin(e){
+ e.preventDefault();let f=Object.fromEntries(new FormData(e.target));
+ if(f.user==="admin"&&f.pass==="A1b2C"){sessionStorage.staff="admin";location.hash="#panel"}else alert("Invalid login");
+}
+function panel(){
+ if(!sessionStorage.staff){location.hash="#login";return}
+ let html=`<div class="card"><h1>Tickets Panel</h1><p>Logged in as admin.</p><button onclick="logout()">Logout</button>`;
+ if(!db.length)html+="<p>No submissions yet.</p>";
+ db.forEach(x=>{let opts=types[x.type].slice(1).map(s=>`<option ${s===x.status?"selected":""}>${s}</option>`).join("");
+ html+=`<div class="item"><b>${types[x.type][0]}</b> — ${x.status}<br><span class="muted">${x.code} · ${esc(x.name)} · ${esc(x.discord)} · ${x.date}</span>
+ <p>${esc(x.content)}</p><textarea id="n${x.id}" placeholder="Staff notes">${esc(x.notes)}</textarea><select id="s${x.id}">${opts}</select><button onclick="updateItem(${x.id})">Save</button></div>`});
+ html+="</div>";document.getElementById("app").innerHTML=html;
+}
+function updateItem(id){let x=db.find(v=>v.id===id);x.status=document.getElementById("s"+id).value;x.notes=document.getElementById("n"+id).value;save();panel()}
+function logout(){sessionStorage.removeItem("staff");location.hash="#login"}
+function home(){document.getElementById("app").innerHTML=`<div class="card"><h1>Support Center</h1><p>Submit an application or ticket and keep your tracking ID to check its status later.</p></div>`}
+function render(){let h=location.hash.slice(1)||"home";if(h==="home")home();else if(types[h])form(h);else if(h==="status")status();else if(h==="login")login();else if(h==="panel")panel();else home()}
+addEventListener("hashchange",render);render();
+</script>
+</body>
+</html>
